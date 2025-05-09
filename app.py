@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 
@@ -24,7 +25,7 @@ with st.form("play_form"):
     time = f"{minute:02}:{second:02}"
 
     team = st.selectbox("チーム", ["濃色", "淡色"])
-    player = st.text_input("背番号", "4")
+    player = st.text_input("選手名または背番号", "田中")
     play_type = st.selectbox(
         "プレイの種類",
         [
@@ -93,78 +94,80 @@ for entry in st.session_state["logs"][quarter]:
     current_score = f"{team_scores.get(team, 0)}点"
     st.write(f"[{entry['時間']}] {entry['内容']} {score_info} | 現在の得点: {current_score}")
 
-# ボックススコア表示
-st.subheader("ボックススコア（全クォーター）")
+# ボックススコア（チーム別）
+st.subheader("ボックススコア（チーム別）")
 
 def build_box_score(logs):
     stats = {}
     for entry in logs:
         p = entry["選手"]
+        t = entry["チーム"]
         play = entry["プレイ種別"]
-        stats.setdefault(p, {
-            "PTS": 0,
-            "FGM": 0, "FGA": 0,
-            "3FGM": 0, "3FGA": 0,
-            "2FGM": 0, "2FGA": 0,
-            "FTM": 0, "FTA": 0,
-            "OREB": 0, "DREB": 0,
-            "TO": 0,
-            "ST": 0,
-            "BLK": 0,
-            "PF": 0
-        })
+        if t not in stats:
+            stats[t] = {}
+        if p not in stats[t]:
+            stats[t][p] = {
+                "PTS": 0,
+                "FGM": 0, "FGA": 0,
+                "3FGM": 0, "3FGA": 0,
+                "2FGM": 0, "2FGA": 0,
+                "FTM": 0, "FTA": 0,
+                "OREB": 0, "DREB": 0,
+                "TO": 0,
+                "ST": 0,
+                "BLK": 0,
+                "PF": 0
+            }
 
+        player_stats = stats[t][p]
         if "3Pシュート" in play:
-            stats[p]["3FGA"] += 1
-            stats[p]["FGA"] += 1
+            player_stats["3FGA"] += 1
+            player_stats["FGA"] += 1
             if "成功" in play:
-                stats[p]["3FGM"] += 1
-                stats[p]["FGM"] += 1
-                stats[p]["PTS"] += 3
+                player_stats["3FGM"] += 1
+                player_stats["FGM"] += 1
+                player_stats["PTS"] += 3
         elif "2Pシュート" in play:
-            stats[p]["2FGA"] += 1
-            stats[p]["FGA"] += 1
+            player_stats["2FGA"] += 1
+            player_stats["FGA"] += 1
             if "成功" in play:
-                stats[p]["2FGM"] += 1
-                stats[p]["FGM"] += 1
-                stats[p]["PTS"] += 2
+                player_stats["2FGM"] += 1
+                player_stats["FGM"] += 1
+                player_stats["PTS"] += 2
         elif "フリースロー" in play:
-            stats[p]["FTA"] += 1
+            player_stats["FTA"] += 1
             if "成功" in play:
-                stats[p]["FTM"] += 1
-                stats[p]["PTS"] += 1
+                player_stats["FTM"] += 1
+                player_stats["PTS"] += 1
         elif "リバウンド（オフェンス）" == play:
-            stats[p]["OREB"] += 1
+            player_stats["OREB"] += 1
         elif "リバウンド（ディフェンス）" == play:
-            stats[p]["DREB"] += 1
+            player_stats["DREB"] += 1
         elif "ターンオーバー" == play:
-            stats[p]["TO"] += 1
+            player_stats["TO"] += 1
         elif "スティール" == play:
-            stats[p]["ST"] += 1
+            player_stats["ST"] += 1
         elif "ブロック" == play:
-            stats[p]["BLK"] += 1
+            player_stats["BLK"] += 1
         elif "ファウル" in play:
-            stats[p]["PF"] += 1
+            player_stats["PF"] += 1
+    return stats
 
-    df = pd.DataFrame(stats).T
+# 出力
+all_logs = sum(st.session_state["logs"].values(), [])
+team_stats = build_box_score(all_logs)
+
+for team_name, player_data in team_stats.items():
+    st.markdown(f"### {team_name} のボックススコア")
+    df = pd.DataFrame(player_data).T
     df["FG%"] = (df["FGM"] / df["FGA"]).replace([float('inf'), float('nan')], 0).apply(lambda x: f"{x:.1%}")
     df["2FG%"] = (df["2FGM"] / df["2FGA"]).replace([float('inf'), float('nan')], 0).apply(lambda x: f"{x:.1%}")
     df["3FG%"] = (df["3FGM"] / df["3FGA"]).replace([float('inf'), float('nan')], 0).apply(lambda x: f"{x:.1%}")
     df["FT%"] = (df["FTM"] / df["FTA"]).replace([float('inf'), float('nan')], 0).apply(lambda x: f"{x:.1%}")
-    return df
+    st.dataframe(df)
 
-all_logs = sum(st.session_state["logs"].values(), [])
+# CSV出力
 if all_logs:
-    box_score_df = build_box_score(all_logs)
-    st.dataframe(box_score_df)
-
-    st.download_button(
-        label="ボックススコアCSVをダウンロード",
-        data=box_score_df.to_csv().encode("utf-8"),
-        file_name="box_score.csv",
-        mime="text/csv"
-    )
-
     raw_log_df = pd.DataFrame(all_logs)
     st.download_button(
         label="プレイバイプレイCSVをダウンロード",
