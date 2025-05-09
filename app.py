@@ -16,9 +16,15 @@ st.title("バスケ・プレイバイプレイ記録アプリ")
 quarter = st.selectbox("クォーターを選択", ["1Q", "2Q", "3Q", "4Q", "OT"])
 
 with st.form("play_form"):
-    time = st.text_input("時間 (MM:SS)", "00:00")
-    team = st.text_input("チーム名", "Team A")
-    player = st.text_input("選手名または背番号", "田中")
+    col1, col2 = st.columns(2)
+    with col1:
+        minute = st.selectbox("分", list(range(0, 11)))
+    with col2:
+        second = st.selectbox("秒", list(range(0, 60)))
+    time = f"{minute:02}:{second:02}"
+
+    team = st.selectbox("チーム", ["濃色", "淡色"])
+    player = st.text_input("背番号", "4")
     play_type = st.selectbox(
         "プレイの種類",
         [
